@@ -64,19 +64,13 @@ decompress(PyObject *self, PyObject *args)
     const char *input;
     int input_len;
     char *output;
-    uint32_t output_len, decompressed_len;
+    uint32_t output_len = 4096;
+    uint32_t decompressed_len;
 
-    if (!PyArg_ParseTuple(args, "s#", &input, &input_len))
+    if (!PyArg_ParseTuple(args, "s#|i", &input, &input_len, &output_len))
         return NULL;
 
-    if ((uint32_t)input_len < sizeof(uint32_t)) {
-        PyErr_SetString(FastlzError, "invalid input");
-        return NULL;
-    }
-
-    memcpy(&output_len, input, sizeof(uint32_t));
-
-    if (output_len / 256.0 > input_len) {
+    if ((uint32_t)input_len == 0) {
         PyErr_SetString(FastlzError, "invalid input");
         return NULL;
     }
@@ -85,22 +79,19 @@ decompress(PyObject *self, PyObject *args)
     if (output == NULL)
         return PyErr_NoMemory();
 
-    input_len -= sizeof(uint32_t);
-    input += sizeof(uint32_t);
-
     decompressed_len = (uint32_t)fastlz_decompress(input, input_len, output,
                                                    output_len);
 
-    if (decompressed_len != output_len) {
+    if (decompressed_len == 0) {
         free(output);
         PyErr_SetString(FastlzError, "could not decompress");
         return NULL;
     }
 
 #if PY_MAJOR_VERSION >= 3
-    result = Py_BuildValue("y#", output, output_len);
+    result = Py_BuildValue("y#", output, decompressed_len);
 #else
-    result = Py_BuildValue("s#", output, output_len);
+    result = Py_BuildValue("s#", output, decompressed_len);
 #endif
     free(output);
     return result;
